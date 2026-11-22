@@ -633,7 +633,7 @@ class WazeClusterControl extends EventEmitter {
             this._askedCluster = null;
             this.emit('change');
         }, CLUSTER_ASKED_MS);
-        this.render.send({ cmd: 'cluster', hud_width_pct: String(pct) });
+        this.render.send({ cmd: 'cluster', cluster_width_pct: String(pct) });
         this.patch.send({ cmd: 'cluster-size', cluster_width_pct: pct });
         this.emit('change');
     }
@@ -684,7 +684,7 @@ class WazeClusterControl extends EventEmitter {
         if (this.canResetCluster()) {
             this._setClusterPos(0, 0);
             this._askedCluster = 0;
-            this.render.send({ cmd: 'cluster', hud_width_pct: '0' });
+            this.render.send({ cmd: 'cluster', cluster_width_pct: '0' });
             this.patch.send({ cmd: 'cluster-size', cluster_width_pct: 0 });
             this.emit('change');
         }
@@ -697,7 +697,7 @@ class WazeClusterControl extends EventEmitter {
             this._askedClusterPos = null;
             this.emit('change');
         }, CLUSTER_ASKED_MS);
-        this.render.send({ cmd: 'cluster', hud_x: String(x), hud_y: String(y) });
+        this.render.send({ cmd: 'cluster', cluster_x: String(x), cluster_y: String(y) });
         this.patch.send({ cmd: 'cluster-pos', cluster_x: x, cluster_y: y });
         this.emit('change');
     }
@@ -1206,7 +1206,7 @@ class WazeClusterControl extends EventEmitter {
             this._noteCardAsked(msg);
             this._wake();
             this.emit('change');
-        } else if (/^(cluster|hud|hud-size|hud-pos|hud-keep-shown)-reply$/.test(msg.ev)) {
+        } else if (/^(cluster|hud|hud-size|hud-pos|hud-keep-shown|cluster-size|cluster-pos)-reply$/.test(msg.ev)) {
             if (!msg.ok) {
                 this._log.info(`patchd did not save the setting: ${msg.reason || 'refused'}`);
             }

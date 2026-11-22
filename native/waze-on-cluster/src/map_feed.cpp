@@ -38,7 +38,9 @@ const char *const kNotTaken = "the cluster renderer does not take it";
 }  // namespace
 
 MapFeed::MapFeed(const FeedConfig &cfg)
-    : cfg_(cfg), client_("waze-on-cluster", cfg.socket), placed_x_(cfg.hud_offset_x), placed_y_(cfg.hud_offset_y)
+    : cfg_(cfg), client_("waze-on-cluster", cfg.socket),
+      placed_x_(cfg.target == "hud" ? cfg.hud_offset_x : cfg.cluster_offset_x),
+      placed_y_(cfg.target == "hud" ? cfg.hud_offset_y : cfg.cluster_offset_y)
 {
     client_.on_ready = [this] {
         connected_ = true;

@@ -254,7 +254,8 @@ var LOCAL_CONF = process.env.WOC_LOCAL_CONF || '/var/opt/waze-on-cluster/waze-on
  * configuration. Not in LOCAL_CONF, which waze-on-cluster 0.8 refuses to
  * start with any of MAP_KEYS in. */
 var MAP_STATE = path.join(STATE_DIR, 'map.state.conf');
-var MAP_KEYS = ['cluster', 'hud', 'hud_width_pct', 'hud_offset_x', 'hud_offset_y', 'hud_keep_shown'];
+var MAP_KEYS = ['cluster', 'hud', 'hud_width_pct', 'hud_offset_x', 'hud_offset_y', 'hud_keep_shown',
+    'cluster_width_pct', 'cluster_offset_x', 'cluster_offset_y'];
 /* The opt-in settings: the render reads this file (its features_file) over
  * its configuration. Not in LOCAL_CONF, which every release up to 0.10.7
  * refuses to start with any of FEATURE_KEYS in; no release before 0.10.9
@@ -431,7 +432,8 @@ function saveLater(settings, withProfiles) {
 var PROFILES_FILE = path.join(STATE_DIR, 'profiles.json');
 var PROFILE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@+={}-]{0,127}$/;
 var MAX_OWN = 16;
-var MAP_DEFAULTS = { cluster: 1, hud: 0, hud_width_pct: 0, hud_offset_x: 0, hud_offset_y: 0, hud_keep_shown: 0 };
+var MAP_DEFAULTS = { cluster: 1, hud: 0, hud_width_pct: 0, hud_offset_x: 0, hud_offset_y: 0, hud_keep_shown: 0,
+    cluster_width_pct: 0, cluster_offset_x: 0, cluster_offset_y: 0 };
 var profiles = null;          /* PROFILES_FILE as read at the start, and changed since */
 var currentProfile;           /* the profile the app last told (null: none; undefined: not told since the start) */
 var restored = false;         /* MAP_STATE written from PROFILES_FILE at the start, not yet told to the app */
