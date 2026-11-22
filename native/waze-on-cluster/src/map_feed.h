@@ -93,6 +93,13 @@ struct FeedConfig {
     /* On the HUD: kept shown over the stock HMI's pop-ups (the layer's
      * yield 0); else it gives way to them (cluster-render's hud_yield_slots). */
     bool hud_keep_shown = false;
+    /* On the cluster: the map's width in percent of the cluster's (its height
+     * follows the picture's shape, at most the cluster's), centred. 0: the
+     * kit's fitted box (the map area). */
+    unsigned cluster_width_pct = 0;
+    /* On the cluster: the map moved from its centred place, in the cluster
+     * scene's pixels (+x right, +y down), held inside the cluster's scene. */
+    int cluster_offset_x = 0, cluster_offset_y = 0;
     /* A target shown smaller than the decoded frame (the HUD) gets the frame
      * scaled on the head unit to the size it is shown at (atlas_scale.h), on
      * a worker thread, at most video.fps a second, rounded to these level
@@ -134,6 +141,8 @@ struct FeedStatus {
     unsigned hud_width_pct = 0;   /* the HUD map's size setting (0: the default) */
     int hud_offset_x = 0, hud_offset_y = 0;   /* and where it is moved to from the centre */
     bool hud_keep_shown = false;   /* the HUD map kept shown over the stock HMI's pop-ups */
+    unsigned cluster_width_pct = 0;   /* the cluster map's size setting (0: the default) */
+    int cluster_offset_x = 0, cluster_offset_y = 0;   /* and where it is moved to from the centre */
 };
 
 /* Whether a status is worth a log line: its state, reason or target differs
@@ -181,6 +190,16 @@ public:
     /* The HUD map kept shown over the stock HMI's pop-ups or not
      * (FeedConfig::hud_keep_shown), at once. */
     void set_hud_keep_shown(bool keep);
+    /* The cluster map's size (FeedConfig::cluster_width_pct), applied at once
+     * to a map on the cluster. */
+    void set_cluster_width(unsigned pct);
+    /* The cluster map moved (FeedConfig::cluster_offset_x/y), at once: the
+     * layer only changes place, no new texture. Held inside the cluster: the
+     * offset the map is at (cluster_offset_x/y, the status's) then is as far
+     * as it goes, and the one asked for is kept for the next size. */
+    void set_cluster_offset(int dx, int dy);
+    int cluster_offset_x() const { return placed_x_; }
+    int cluster_offset_y() const { return placed_y_; }
     /* A layer to take frames: made, and not reported disabled by
      * cluster-render. */
     bool takes_frames() const { return layer_ && !disabled(); }

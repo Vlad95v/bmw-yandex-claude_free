@@ -4,6 +4,8 @@
  * and the tool (README.md "Using it").
  *
  *   owner -> tool  {"cmd":"cluster","on":"0"|"1"}  the map on the cluster off or on
+ *                  {"cmd":"cluster","cluster_width_pct":"0"|"20".."100"}  the cluster map's size
+ *                  {"cmd":"cluster","cluster_x":"-800".."800","cluster_y":...}  where it is, from the centre
  *                  {"cmd":"hud","on":"0"|"1"}  the map on the HUD off or on
  *                  {"cmd":"hud","hud_width_pct":"0"|"20".."100"}  the HUD map's size
  *                  {"cmd":"hud","hud_x":"-800".."800","hud_y":...}  where it is, from the centre
@@ -11,7 +13,8 @@
  *                  {"cmd":"guide","hide":0|1}  BMW's turn box hidden or not (guide_setting.h)
  *   tool -> owner  {"ev":"status",...,"hide_bmw_guidance":0|1,"guide_disabled":0|1,
  *                   "cluster":0|1,"hud":0|1,"hud_state":"off"|"disabled"|"idle"|"starting"|"showing"|...,
- *                   "hud_width_pct":...,"hud_x":...,"hud_y":...,"hud_keep_shown":0|1}
+ *                   "hud_width_pct":...,"hud_x":...,"hud_y":...,"hud_keep_shown":0|1,
+ *                   "cluster_width_pct":...,"cluster_x":...,"cluster_y":...}
  *                  {"ev":"log","line":...}
  *
  * One connection is the owner; a second one is told "busy" and closed. */

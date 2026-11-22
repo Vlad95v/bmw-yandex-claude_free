@@ -59,7 +59,7 @@ const OnlineApp = require('oap-sdk/src/core/OnlineApp.js');
 const logging = require('oap-sdk/src/logging/logging');
 const someipBuilders = require('oap-sdk/src/someip/someipBuilders');
 const i18n = require('./i18n.js');
-const { WazeClusterControl, ZOOM_STEP, SHOWN_ON } = require('./waze_cluster_control.js');
+const { WazeClusterControl, ZOOM_STEP, SHOWN_ON, CLUSTER_SIZE_STEPS } = require('./waze_cluster_control.js');
 const { LogsControl, ROWS: LOGS_ROWS } = require('./logs_control.js');
 const { qrPng } = require('./qr.js');
 const { ProfileSync, sessionReader } = require('./profile_sync.js');
@@ -85,6 +85,7 @@ const AA_CARD_NAME = 'wocAaCard';
 const GUIDE_NAME = 'wocGuide';
 const HEAD_GENERAL_NAME = 'wocHeadGeneral';
 const HEAD_HUD_NAME = 'wocHeadHud';
+const HEAD_CLUSTER_DISPLAY_NAME = 'wocHeadClusterDisplay';
 const HUD_NAME = 'wocHud';
 const HUD_KEEP_NAME = 'wocHudKeep';
 const SHOW_ON_NAME = 'wocShowOn';
@@ -93,6 +94,11 @@ const HUD_SIZE_NAME = 'wocHudSize';
 const HUD_POS_NAME = 'wocHudPos';
 const HUD_MOVE_NAMES = { left: 'wocHudLeft', right: 'wocHudRight', up: 'wocHudUp', down: 'wocHudDown' };
 const HUD_CENTRE_NAME = 'wocHudCentre';
+const CLUSTER_ZOOM_NAME = 'wocClusterZoom';
+const CLUSTER_POS_NAME = 'wocClusterPos';
+const CLUSTER_MOVE_NAMES = { left: 'wocClusterLeft', right: 'wocClusterRight', up: 'wocClusterUp', down: 'wocClusterDown' };
+const CLUSTER_CENTRE_NAME = 'wocClusterCentre';
+const CLUSTER_RESET_NAME = 'wocClusterReset';
 const CAPTURE_NAME = 'wocCapture';
 const CAPTURE_STATUS = 'wocCaptureStatus';
 const LOGS_NAME = 'wocLogs';
@@ -206,8 +212,10 @@ class WazeClusterApp extends OnlineApp {
         }
         const names = [STATUS_NAME, MAP_NAME, RESTART_STATUS_NAME, ENABLE_NAME, DISABLE_NAME, WIFI_NAME, WIFI_HINT_NAME, AA_STATUS_NAME,
             AA_ENABLE_NAME, AA_DISABLE_NAME, AA_ZOOM_NAME, AA_ZOOM_OUT_NAME, AA_ZOOM_IN_NAME, AA_CARD_NAME, RESTART_NAME, GUIDE_NAME,
-            HEAD_GENERAL_NAME, HEAD_HUD_NAME, SHOW_ON_NAME, PROFILE_NAME, HUD_NAME, HUD_KEEP_NAME, HUD_SIZE_NAME, HUD_POS_NAME]
-            .concat(Object.values(HUD_MOVE_NAMES), [HUD_CENTRE_NAME, CAPTURE_NAME, CAPTURE_STATUS,
+            HEAD_GENERAL_NAME, HEAD_HUD_NAME, HEAD_CLUSTER_DISPLAY_NAME, SHOW_ON_NAME, PROFILE_NAME, HUD_NAME, HUD_KEEP_NAME, HUD_SIZE_NAME, HUD_POS_NAME]
+            .concat(Object.values(HUD_MOVE_NAMES), [HUD_CENTRE_NAME,
+            CLUSTER_ZOOM_NAME, CLUSTER_POS_NAME], Object.values(CLUSTER_MOVE_NAMES), [CLUSTER_CENTRE_NAME, CLUSTER_RESET_NAME,
+            CAPTURE_NAME, CAPTURE_STATUS,
                 LOGS_NAME, LOGS_SAVE, LOGS_STATUS, LOGS_QR, LOGS_URL], LOGS_ROW_NAMES);
         names.forEach((name) => { this._components[name] = rhmi.getByName(name); });
         const missing = names.filter((name) => !this._components[name]);
@@ -264,6 +272,18 @@ class WazeClusterApp extends OnlineApp {
         });
         Object.keys(HUD_MOVE_NAMES).forEach((dir) => this._bind(HUD_MOVE_NAMES[dir], () => this._control.moveHud(dir)));
         this._bind(HUD_CENTRE_NAME, () => this._control.centreHud());
+        /* Cluster Display Settings bindings */
+        this._components[CLUSTER_ZOOM_NAME].on('changed', (step) => {
+            if (step !== this._written[`cell:${CLUSTER_ZOOM_NAME}:0:Value`]) {
+                logger.info(`SLIDER ${CLUSTER_ZOOM_NAME} ${step}`);
+                delete this._written[`cell:${CLUSTER_ZOOM_NAME}:0:Value`];
+                this._control.setClusterSizeStep(step);
+                setImmediate(() => this._render());
+            }
+        });
+        Object.keys(CLUSTER_MOVE_NAMES).forEach((dir) => this._bind(CLUSTER_MOVE_NAMES[dir], () => this._control.moveCluster(dir)));
+        this._bind(CLUSTER_CENTRE_NAME, () => this._control.centreCluster());
+        this._bind(CLUSTER_RESET_NAME, () => this._control.resetCluster());
         this._bind(CAPTURE_NAME, () => this._control.capture());
         this._bind(LOGS_NAME, () => Promise.resolve(rhmi.openState(LOGS_STATE))
             .catch((err) => logger.warn(`openState ${LOGS_STATE} failed: ${err && err.message}`)));
@@ -584,6 +604,19 @@ class WazeClusterApp extends OnlineApp {
         this._write(HUD_POS_NAME, c.hudPositionText());
         Object.values(HUD_MOVE_NAMES).forEach((n) => this._setEnabled(n, adjust));
         this._setEnabled(HUD_CENTRE_NAME, c.canCentreHud());
+
+        /* Cluster Display Settings */
+        this._write(HEAD_CLUSTER_DISPLAY_NAME, t('Cluster Display Settings'));
+        this._writeCell(CLUSTER_ZOOM_NAME, 'TextDescription', c.clusterSizeText(), 'Text', 0);
+        if (c.clusterSizeStep() !== null) {
+            this._writeCell(CLUSTER_ZOOM_NAME, 'Value', c.clusterSizeStep(), 'SInt', 0);
+        }
+        const clusterAdjust = c.canChangeClusterSize();
+        this._setEnabled(CLUSTER_ZOOM_NAME, clusterAdjust);
+        this._write(CLUSTER_POS_NAME, c.clusterPositionText());
+        Object.values(CLUSTER_MOVE_NAMES).forEach((n) => this._setEnabled(n, clusterAdjust));
+        this._setEnabled(CLUSTER_CENTRE_NAME, c.canCentreCluster());
+        this._setEnabled(CLUSTER_RESET_NAME, c.canResetCluster());
     }
 
     _renderLogs() {

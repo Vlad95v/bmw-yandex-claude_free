@@ -102,6 +102,24 @@ void MapFeeds::set_hud_keep_shown(bool keep)
         hud_->set_hud_keep_shown(keep);
 }
 
+void MapFeeds::set_cluster_width(unsigned pct)
+{
+    if (pct > 100)
+        pct = 100;
+    base_.cluster_width_pct = pct;
+    if (cluster_)
+        cluster_->set_cluster_width(pct);
+}
+
+void MapFeeds::set_cluster_offset(int dx, int dy)
+{
+    base_.cluster_offset_x = dx;
+    base_.cluster_offset_y = dy;
+    if (!cluster_)
+        return;
+    cluster_->set_cluster_offset(dx, dy);
+}
+
 void MapFeeds::set_guide_hold(bool hold)
 {
     base_.guide_hold = hold;
@@ -212,6 +230,9 @@ FeedStatus MapFeeds::status(const std::string &decode, const std::string &stream
     s.hud_keep_shown = base_.hud_keep_shown;
     s.hud_offset_x = hud_ ? hud_->hud_offset_x() : base_.hud_offset_x;
     s.hud_offset_y = hud_ ? hud_->hud_offset_y() : base_.hud_offset_y;
+    s.cluster_width_pct = base_.cluster_width_pct;
+    s.cluster_offset_x = cluster_ ? cluster_->cluster_offset_x() : base_.cluster_offset_x;
+    s.cluster_offset_y = cluster_ ? cluster_->cluster_offset_y() : base_.cluster_offset_y;
     return s;
 }
 

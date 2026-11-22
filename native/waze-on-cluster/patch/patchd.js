@@ -50,6 +50,8 @@
  *                  {"cmd":"hud-size","hud_width_pct":0|20..100}   (over 85 saved as 85)
  *                  {"cmd":"hud-pos","hud_x":-800..800,"hud_y":-800..800}
  *                  {"cmd":"hud-keep-shown","on":0|1}
+ *                  {"cmd":"cluster-size","cluster_width_pct":0|20..100}
+ *                  {"cmd":"cluster-pos","cluster_x":-800..800,"cluster_y":-800..800}
  *                                   the map on the cluster on or off, on the HUD on
  *                                   or off, the HUD's size
  *                                   (0: the default box), where it is moved from
@@ -57,12 +59,15 @@
  *                                   shown over BMW's pop-ups, saved for the render's
  *                                   next start as "cluster", "hud", "hud_width_pct",
  *                                   "hud_offset_x", "hud_offset_y" and
- *                                   "hud_keep_shown" in MAP_STATE
+ *                                   "hud_keep_shown" in MAP_STATE; the cluster
+ *                                   size and position as "cluster_width_pct",
+ *                                   "cluster_offset_x", "cluster_offset_y"
  *                                   (the app changes the running render itself).
  *                                   Changes are written together MAP_SAVE_MS
  *                                   after the last one; the reply (cluster-reply,
  *                                   hud-reply, hud-size-reply, hud-pos-reply,
- *                                   hud-keep-shown-reply)
+ *                                   hud-keep-shown-reply, cluster-size-reply,
+ *                                   cluster-pos-reply)
  *                                   follows the write and carries ok, the values
  *                                   saved and reason.
  *                  {"cmd":"profile","id":"<id>"|null}
@@ -287,8 +292,8 @@ function rewriteConf(file, set, drop) {
  * range (the commands' below). */
 function mapValueOk(k, v) {
     var n = Number(v);
-    return /^-?\d+$/.test(v) && (k === 'hud_width_pct' ? n === 0 || (n >= 20 && n <= 100)
-        : /^hud_offset_/.test(k) ? n >= -800 && n <= 800 : n === 0 || n === 1);
+    return /^-?\d+$/.test(v) && (k === 'hud_width_pct' || k === 'cluster_width_pct' ? n === 0 || (n >= 20 && n <= 100)
+        : /^(hud_offset_|cluster_offset_)/.test(k) ? n >= -800 && n <= 800 : n === 0 || n === 1);
 }
 
 /* Moves any of MAP_KEYS found in LOCAL_CONF into MAP_STATE, a value already
@@ -337,6 +342,11 @@ function moveFeatures() {
 /* A HUD offset: a whole number in -800..800. */
 function isOffset(v) {
     return typeof v === 'number' && v === Math.floor(v) && v >= -800 && v <= 800;
+}
+
+/* A cluster width: 0 or 20-100 %. */
+function isClusterWidth(v) {
+    return typeof v === 'number' && v === Math.floor(v) && (v === 0 || (v >= 20 && v <= 100));
 }
 /* The map's settings wait MAP_SAVE_MS after the last change and go to
  * MAP_STATE in one write (a press of Move or a turn of the slider each
@@ -2314,6 +2324,23 @@ function handle(line, sock) {
     if (msg.cmd === 'hud-keep-shown') {
         if (msg.on !== 0 && msg.on !== 1) { reply(sock, { ev: 'hud-keep-shown-reply', ok: false, reason: 'on must be 0 or 1' }); return; }
         saveMapSettings(sock, 'hud-keep-shown-reply', { hud_keep_shown: msg.on }, 'the HUD map over pop-ups');
+        return;
+    }
+    if (msg.cmd === 'cluster-size') {
+        var pct = msg.cluster_width_pct;
+        if (!isClusterWidth(pct)) {
+            reply(sock, { ev: 'cluster-size-reply', ok: false, reason: 'cluster width must be 0 or 20-100 %' });
+            return;
+        }
+        saveMapSettings(sock, 'cluster-size-reply', { cluster_width_pct: pct }, 'the cluster map size');
+        return;
+    }
+    if (msg.cmd === 'cluster-pos') {
+        if (!isOffset(msg.cluster_x) || !isOffset(msg.cluster_y)) {
+            reply(sock, { ev: 'cluster-pos-reply', ok: false, reason: 'cluster offsets must be whole numbers from -800 to 800' });
+            return;
+        }
+        saveMapSettings(sock, 'cluster-pos-reply', { cluster_offset_x: msg.cluster_x, cluster_offset_y: msg.cluster_y }, 'the cluster map position');
         return;
     }
     /* The driver profile and its own settings: not operations on carplay either. */

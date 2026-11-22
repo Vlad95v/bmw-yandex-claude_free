@@ -106,12 +106,19 @@ const SAFE = '504x368+286+72';
  * whole), HUD_SIZE_STEPS of them. Standard (0) counts as HUD_STANDARD_PCT, about what the fitted box is. */
 const HUD_MIN_PCT = 30, HUD_MAX_PCT = 85, HUD_STEP_PCT = 5, HUD_STANDARD_PCT = 57;
 const HUD_SIZE_STEPS = (HUD_MAX_PCT - HUD_MIN_PCT) / HUD_STEP_PCT;
+/* The cluster map's size: CLUSTER_STEP_PCT steps from CLUSTER_MIN_PCT to CLUSTER_MAX_PCT (100 %),
+ * CLUSTER_SIZE_STEPS of them. Standard (0) counts as CLUSTER_STANDARD_PCT, about the map area. */
+const CLUSTER_MIN_PCT = 30, CLUSTER_MAX_PCT = 100, CLUSTER_STEP_PCT = 5, CLUSTER_STANDARD_PCT = 100;
+const CLUSTER_SIZE_STEPS = (CLUSTER_MAX_PCT - CLUSTER_MIN_PCT) / CLUSTER_STEP_PCT;
 /* Where the map can show, the choices in their order on the page. */
 const SHOWN_ON = ['cluster', 'hud', 'both', 'off'];
 /* The HUD map moved from its centre, HUD_MOVE_PX a press, within +-HUD_MOVE_MAX; the render holds it inside the
  * HUD and reports the offset as far as it went. An asked size or place shows until the render's status has it,
  * HUD_ASKED_MS has passed, the render reconnects or patchd fails to save the size; then the render's own. */
 const HUD_MOVE_PX = 10, HUD_MOVE_MAX = 400, HUD_ASKED_MS = 300;
+/* The cluster map moved from its centre, CLUSTER_MOVE_PX a press, within +-CLUSTER_MOVE_MAX; the render holds
+ * it inside the cluster and reports the offset as far as it went. */
+const CLUSTER_MOVE_PX = 10, CLUSTER_MOVE_MAX = 400, CLUSTER_ASKED_MS = 300;
 const MOVES = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
 
 /* One newline-delimited-JSON stream socket, reconnecting while open.
@@ -287,6 +294,10 @@ class WazeClusterControl extends EventEmitter {
         this._forget();
         this.captureState = { state: 'unavailable' };
         this.renderStatus = null;   /* the render tool's last status while connected */
+        this._askedCluster = null;
+        this._askedClusterTimer = null;
+        this._askedClusterPos = null;
+        this._askedClusterPosTimer = null;
 
         this.render = new LineSocket({
             path: o.renderPath || RENDER_PATH,
@@ -325,6 +336,10 @@ class WazeClusterControl extends EventEmitter {
         clearTimeout(this._askedPosTimer);
         this._askedPos = null;
         this._clearAskedHud();
+        clearTimeout(this._askedClusterTimer);
+        this._askedCluster = null;
+        clearTimeout(this._askedClusterPosTimer);
+        this._askedClusterPos = null;
         this.render.close();
         this.patch.close();
         this.renderStatus = null;
@@ -563,6 +578,132 @@ class WazeClusterControl extends EventEmitter {
 
     hudPositionText() {
         const at = this.hudOffset();
+        if (!at) {
+            return t('Position: {0}', '—');
+        }
+        const [x, y] = at;
+        if (!x && !y) {
+            return t('Position: {0}', t('Centre'));
+        }
+        const h = x > 0 ? t('{0} px right', x) : x < 0 ? t('{0} px left', -x) : '';
+        const v = y > 0 ? t('{0} px down', y) : y < 0 ? t('{0} px up', -y) : '';
+        return t('Position: {0}', h && v ? t('{0}, {1}', h, v) : h || v);
+    }
+
+    /* ---- Cluster Display Settings ---- */
+    clusterWidth() {
+        if (this._askedCluster != null) {
+            return this._askedCluster;
+        }
+        const v = this.renderStatus && this.renderStatus.cluster_width_pct;
+        return typeof v === 'number' ? v : null;
+    }
+
+    clusterSizeText() {
+        const w = this.clusterWidth();
+        return t('Zoom: {0}', w == null ? '—' : w === 0 ? t('Standard') : t('{0} %', w));
+    }
+
+    /* The size changes only while the cluster map is on. */
+    canChangeClusterSize() {
+        return this.render.connected() && this.clusterOn() === true;
+    }
+
+    /* The size as a slider position, 0 (CLUSTER_MIN_PCT) to CLUSTER_SIZE_STEPS
+     * (CLUSTER_MAX_PCT); Standard sits at the step at or below its ~100 %. Null
+     * while the render has not said. */
+    clusterSizeStep() {
+        const w = this.clusterWidth();
+        if (w == null) {
+            return null;
+        }
+        const pct = Math.max(CLUSTER_MIN_PCT, Math.min(CLUSTER_MAX_PCT, w || CLUSTER_STANDARD_PCT));
+        return Math.floor((pct - CLUSTER_MIN_PCT) / CLUSTER_STEP_PCT);
+    }
+
+    /* The cluster map at a slider position: the render at once, patchd saves it. */
+    setClusterSizeStep(step) {
+        if (!Number.isInteger(step) || step < 0 || step > CLUSTER_SIZE_STEPS || !this.canChangeClusterSize() || step === this.clusterSizeStep()) {
+            return;
+        }
+        const pct = CLUSTER_MIN_PCT + step * CLUSTER_STEP_PCT;
+        this._askedCluster = pct;
+        clearTimeout(this._askedClusterTimer);
+        this._askedClusterTimer = setTimeout(() => {
+            this._askedCluster = null;
+            this.emit('change');
+        }, CLUSTER_ASKED_MS);
+        this.render.send({ cmd: 'cluster', hud_width_pct: String(pct) });
+        this.patch.send({ cmd: 'cluster-size', cluster_width_pct: pct });
+        this.emit('change');
+    }
+
+    _clearAskedCluster() {
+        clearTimeout(this._askedClusterTimer);
+        this._askedCluster = null;
+    }
+
+    /* ---- where the cluster map is: moved from its centre, in cluster pixels ---- */
+    clusterOffset() {
+        if (this._askedClusterPos) {
+            return this._askedClusterPos;
+        }
+        const s = this.renderStatus;
+        return s && typeof s.cluster_x === 'number' ? [s.cluster_x, s.cluster_y] : null;
+    }
+
+    /* Moves it a step (left / right / up / down): the render moves it at once, patchd saves it. */
+    moveCluster(dir) {
+        const d = MOVES[dir];
+        const at = this.clusterOffset();
+        if (!d || !at || !this.canChangeClusterSize()) {
+            return;
+        }
+        const clamp = (v) => Math.max(-CLUSTER_MOVE_MAX, Math.min(CLUSTER_MOVE_MAX, v));
+        this._setClusterPos(clamp(at[0] + d[0] * CLUSTER_MOVE_PX), clamp(at[1] + d[1] * CLUSTER_MOVE_PX));
+    }
+
+    canCentreCluster() {
+        const at = this.clusterOffset();
+        return this.canChangeClusterSize() && !!at && (at[0] !== 0 || at[1] !== 0);
+    }
+
+    centreCluster() {
+        if (this.canCentreCluster()) {
+            this._setClusterPos(0, 0);
+        }
+    }
+
+    canResetCluster() {
+        const at = this.clusterOffset();
+        const w = this.clusterWidth();
+        return this.canChangeClusterSize() && (!!at && (at[0] !== 0 || at[1] !== 0) || w != null && w !== 0);
+    }
+
+    resetCluster() {
+        if (this.canResetCluster()) {
+            this._setClusterPos(0, 0);
+            this._askedCluster = 0;
+            this.render.send({ cmd: 'cluster', hud_width_pct: '0' });
+            this.patch.send({ cmd: 'cluster-size', cluster_width_pct: 0 });
+            this.emit('change');
+        }
+    }
+
+    _setClusterPos(x, y) {
+        this._askedClusterPos = [x, y];
+        clearTimeout(this._askedClusterPosTimer);
+        this._askedClusterPosTimer = setTimeout(() => {
+            this._askedClusterPos = null;
+            this.emit('change');
+        }, CLUSTER_ASKED_MS);
+        this.render.send({ cmd: 'cluster', hud_x: String(x), hud_y: String(y) });
+        this.patch.send({ cmd: 'cluster-pos', cluster_x: x, cluster_y: y });
+        this.emit('change');
+    }
+
+    clusterPositionText() {
+        const at = this.clusterOffset();
         if (!at) {
             return t('Position: {0}', '—');
         }
@@ -1042,6 +1183,12 @@ class WazeClusterControl extends EventEmitter {
             if (this._askedPos && msg.hud_x === this._askedPos[0] && msg.hud_y === this._askedPos[1]) {
                 this._askedPos = null;
             }
+            if (this._askedCluster != null && msg.cluster_width_pct === this._askedCluster) {
+                this._clearAskedCluster();
+            }
+            if (this._askedClusterPos && msg.cluster_x === this._askedClusterPos[0] && msg.cluster_y === this._askedClusterPos[1]) {
+                this._askedClusterPos = null;
+            }
             this.emit('change');
         }
     }
@@ -1084,5 +1231,5 @@ class WazeClusterControl extends EventEmitter {
 module.exports = {
     WazeClusterControl, LineSocket,
     RENDER_PATH, PATCH_PATH, PENDING_PATH, AA_PENDING_PATH, BOOT_ID_PATH,
-    SIZE, SAFE, ZOOM_STEP, RESTART_FAILED, SHOWN_ON, HUD_SIZE_STEPS
+    SIZE, SAFE, ZOOM_STEP, RESTART_FAILED, SHOWN_ON, HUD_SIZE_STEPS, CLUSTER_SIZE_STEPS
 };

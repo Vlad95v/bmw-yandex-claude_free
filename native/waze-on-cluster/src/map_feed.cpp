@@ -244,17 +244,29 @@ void MapFeed::set_host(const cr::Host &h)
 /* Where the map goes on a target of tw x th: the kit's fitted rect, or on
  * the HUD with a size set, that width (the picture's shape kept, at most the
  * HUD's height), centred; on the HUD then moved by the offset, held inside
- * the scene. */
+ * the scene. For the cluster (target "map"), the same with cluster_width_pct
+ * and cluster_offset_x/y. */
 crk::QuadRect MapFeed::quad(uint32_t tw, uint32_t th) const
 {
-    if (cfg_.target != "hud" || !cfg_.video.w || !cfg_.video.h)
+    if (cfg_.target != "hud" && cfg_.target != "map")
         return crk::map_quad(tw, th, cfg_.video.w, cfg_.video.h);
     crk::QuadRect q;
-    const unsigned pct = cfg_.hud_width_pct;
+    unsigned pct = 0;
+    int offset_x = 0, offset_y = 0;
+    if (cfg_.target == "hud") {
+        pct = cfg_.hud_width_pct;
+        offset_x = cfg_.hud_offset_x;
+        offset_y = cfg_.hud_offset_y;
+    } else {  // cluster ("map")
+        pct = cfg_.cluster_width_pct;
+        offset_x = cfg_.cluster_offset_x;
+        offset_y = cfg_.cluster_offset_y;
+    }
     if (!pct) {
         q = crk::map_quad(tw, th, cfg_.video.w, cfg_.video.h);
     } else {
-        uint64_t w = (uint64_t)tw * (pct > kHudMaxPct ? kHudMaxPct : pct) / 100;
+        const unsigned max_pct = (cfg_.target == "hud") ? kHudMaxPct : 100;
+        uint64_t w = (uint64_t)tw * (pct > max_pct ? max_pct : pct) / 100;
         uint64_t h = (w * cfg_.video.h + cfg_.video.w / 2) / cfg_.video.w;
         if (h > th) {
             h = th;
@@ -262,7 +274,7 @@ crk::QuadRect MapFeed::quad(uint32_t tw, uint32_t th) const
         }
         q = crk::QuadRect{(uint32_t)((tw - w) / 2), (uint32_t)((th - h) / 2), (uint32_t)w, (uint32_t)h};
     }
-    const long x = (long)q.x + cfg_.hud_offset_x, y = (long)q.y + cfg_.hud_offset_y;
+    const long x = (long)q.x + offset_x, y = (long)q.y + offset_y;
     const long xmax = (long)tw - (long)q.w, ymax = (long)th - (long)q.h;
     const uint32_t cx = q.x, cy = q.y;
     q.x = (uint32_t)(x < 0 ? 0 : x > xmax ? xmax : x);
@@ -315,6 +327,40 @@ void MapFeed::set_hud_width(unsigned pct)
     client_.drop(layer_);
     layer_ = 0;
     make_layer();
+}
+
+void MapFeed::set_cluster_width(unsigned pct)
+{
+    if (pct == cfg_.cluster_width_pct)
+        return;
+    cfg_.cluster_width_pct = pct;
+    uint32_t tw, th;
+    /* hosted, the host sizes it: the width waits for the cluster's own */
+    if (cfg_.target != "map" || !layer_ || hosted() || !target_size(client_.targets, "map", &tw, &th))
+        return;
+    /* the texture's size changes with it: a new layer at the new size */
+    log_info("render: cluster map %u%% wide", pct);
+    keep_newest();
+    client_.drop(layer_);
+    layer_ = 0;
+    make_layer();
+}
+
+void MapFeed::set_cluster_offset(int dx, int dy)
+{
+    if (dx == cfg_.cluster_offset_x && dy == cfg_.cluster_offset_y)
+        return;
+    cfg_.cluster_offset_x = placed_x_ = dx;
+    cfg_.cluster_offset_y = placed_y_ = dy;
+    uint32_t tw, th;
+    /* hosted, the host places it: the offset waits for the cluster's own */
+    if (cfg_.target != "map" || !layer_ || hosted() || !target_size(client_.targets, "map", &tw, &th))
+        return;
+    const crk::QuadRect q = quad(tw, th);
+    lo_.x = (int)q.x;
+    lo_.y = (int)q.y;
+    client_.set(layer_, lo_);
+    log_info("render: cluster map moved to %u,%u (offset %+d,%+d)", q.x, q.y, placed_x_, placed_y_);
 }
 
 void MapFeed::set_guide_hold(bool hold)
@@ -570,6 +616,9 @@ FeedStatus MapFeed::status(const std::string &decode, const std::string &stream)
     s.hud_offset_x = placed_x_;
     s.hud_keep_shown = cfg_.hud_keep_shown;
     s.hud_offset_y = placed_y_;
+    s.cluster_width_pct = cfg_.cluster_width_pct;
+    s.cluster_offset_x = placed_x_;
+    s.cluster_offset_y = placed_y_;
     s.upload_cap_kb = cap_kb_;
     s.upload_reason = budget_reason_;
     s.guide_hold = cfg_.guide_hold;

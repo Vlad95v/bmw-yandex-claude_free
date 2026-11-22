@@ -80,6 +80,8 @@ std::string status_line(const FeedStatus &s)
            ",\"hud_width_pct\":" + std::to_string(s.hud_width_pct) +
            ",\"hud_x\":" + std::to_string(s.hud_offset_x) + ",\"hud_y\":" + std::to_string(s.hud_offset_y) +
            ",\"hud_keep_shown\":" + (s.hud_keep_shown ? "1" : "0") +
+           ",\"cluster_width_pct\":" + std::to_string(s.cluster_width_pct) +
+           ",\"cluster_x\":" + std::to_string(s.cluster_offset_x) + ",\"cluster_y\":" + std::to_string(s.cluster_offset_y) +
            /* only while hosted: otherwise the line is as it always was */
            (s.hosted ? ",\"hosted\":1" : "") + "}";
 }
@@ -102,8 +104,33 @@ public:
         if (cmd == "guide" && hide != msg.end() && guide_->set(hide->second)) {
             log_info("guide: BMW's turn box %s while the map shows", guide_->hide() ? "hidden" : "shown");
             feeds_->set_guide_hold(guide_->hide());
-        } else if (cmd == "cluster" && on != msg.end() && (on->second == "0" || on->second == "1")) {
-            feeds_->set_cluster(on->second == "1");
+        } else if (cmd == "cluster" && (on != msg.end() || pct != msg.end() || hx != msg.end() || hy != msg.end())) {
+            if (on != msg.end()) {
+                if (on->second == "0" || on->second == "1")
+                    feeds_->set_cluster(on->second == "1");
+                else
+                    log_warn("cluster: on must be 0 or 1, not %s", on->second.c_str());
+            }
+            if (pct != msg.end()) {
+                const long v = std::strtol(pct->second.c_str(), nullptr, 10);
+                if (v == 0 || (v >= 20 && v <= 100)) {
+                    log_info("cluster: map %ld%% wide", v);
+                    feeds_->set_cluster_width((unsigned)v);
+                } else {
+                    log_warn("cluster: width %s out of range (0, or 20-100)", pct->second.c_str());
+                }
+            }
+            /* and where it is: moved from the centre, in cluster pixels (-800..800 each; held inside the cluster) */
+            if (hx != msg.end() || hy != msg.end()) {
+                const long x = hx != msg.end() ? std::strtol(hx->second.c_str(), nullptr, 10) : feeds_->cluster_offset_x();
+                const long y = hy != msg.end() ? std::strtol(hy->second.c_str(), nullptr, 10) : feeds_->cluster_offset_y();
+                if (x >= -800 && x <= 800 && y >= -800 && y <= 800) {
+                    log_info("cluster: map moved %+ld,%+ld from the centre", x, y);
+                    feeds_->set_cluster_offset((int)x, (int)y);
+                } else {
+                    log_warn("cluster: offset %ld,%ld out of range (-800..800)", x, y);
+                }
+            }
         } else if (cmd == "hud" && (on != msg.end() || pct != msg.end() || hx != msg.end() || hy != msg.end() ||
                                     keep != msg.end())) {
             if (on != msg.end()) {
@@ -206,6 +233,7 @@ int serve(Config cfg)
         {"hud_width_pct", 0, 100},  {"hud_offset_x", -800, 800},     {"hud_offset_y", -800, 800},
         {"hud_scale_down", 0, 1},   {"hud_round_corners", 0, 1},     {"hud_black_background", 0, 1},
         {"hud_keep_shown", 0, 1},
+        {"cluster_width_pct", 0, 100}, {"cluster_offset_x", -800, 800}, {"cluster_offset_y", -800, 800},
         {"freeze_ms", 0, 600000},   {"freeze_min_fps", 1, 60},       {"alt_screen_port", 0, 65535},
         {"idle_ms", 1000, 600000},  {"blank_ms", 1000, 600000},
         {"alt_screen_uid", 0, 4294967294L}, {"gpu_copy", 0, 1},   {"hosted_vpp_scale", 0, 1},
@@ -256,6 +284,13 @@ int serve(Config cfg)
     fc.hud_offset_x = (int)cfg.num("hud_offset_x");
     fc.hud_offset_y = (int)cfg.num("hud_offset_y");
     fc.hud_keep_shown = cfg.num("hud_keep_shown") != 0;
+    fc.cluster_width_pct = (unsigned)cfg.num("cluster_width_pct");
+    if (fc.cluster_width_pct && fc.cluster_width_pct < 20) {
+        log_warn("cluster_width_pct %u: 0 or 20-100; the default box instead", fc.cluster_width_pct);
+        fc.cluster_width_pct = 0;
+    }
+    fc.cluster_offset_x = (int)cfg.num("cluster_offset_x");
+    fc.cluster_offset_y = (int)cfg.num("cluster_offset_y");
     fc.scale_down = cfg.num("hud_scale_down") != 0;
     fc.hud_round_corners = cfg.num("hud_round_corners") != 0;
     fc.hud_black_background = cfg.num("hud_black_background") != 0;

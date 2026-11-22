@@ -143,6 +143,224 @@
             }
           ]
         },
+        "100": {
+          "type": "label",
+          "name": "wocHeadClusterDisplay",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 0,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Cluster Display Settings",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "101": {
+          "type": "slider",
+          "name": "wocClusterZoom",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "TextDescription": {
+                "value": "Zoom: —",
+                "type": "Text"
+              },
+              "TextDescriptionVisible": {
+                "value": true,
+                "type": "Bool"
+              },
+              "MiddleIndicatorVisible": {
+                "value": false,
+                "type": "Bool"
+              },
+              "MinValue": {
+                "value": 0,
+                "type": "SInt"
+              },
+              "MaxValue": {
+                "value": 11,
+                "type": "SInt"
+              },
+              "NumberOfSteps": {
+                "value": 11,
+                "type": "SInt"
+              }
+            }
+          ]
+        },
+        "102": {
+          "type": "label",
+          "name": "wocClusterPos",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 0,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Position: —",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "103": {
+          "type": "button",
+          "name": "wocClusterLeft",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Move left",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "104": {
+          "type": "button",
+          "name": "wocClusterRight",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Move right",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "105": {
+          "type": "button",
+          "name": "wocClusterUp",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Move up",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "106": {
+          "type": "button",
+          "name": "wocClusterDown",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Move down",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "107": {
+          "type": "button",
+          "name": "wocClusterCentre",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Centre",
+                "type": "Text"
+              }
+            }
+          ]
+        },
+        "108": {
+          "type": "button",
+          "name": "wocClusterReset",
+          "properties": {
+            "Visible": {
+              "value": 1,
+              "type": "UInt"
+            },
+            "Focusable": {
+              "value": 3,
+              "type": "UInt"
+            }
+          },
+          "rows": [
+            {
+              "Text": {
+                "value": "Reset",
+                "type": "Text"
+              }
+            }
+          ]
+        },
         "35": {
           "type": "checkBox",
           "name": "wocGuide",

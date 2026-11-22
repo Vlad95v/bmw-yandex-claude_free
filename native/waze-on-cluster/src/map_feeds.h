@@ -64,6 +64,12 @@ public:
     void set_hud_keep_shown(bool keep);
     int hud_offset_x() const { return base_.hud_offset_x; }
     int hud_offset_y() const { return base_.hud_offset_y; }
+    /* The cluster map's size and place as asked, kept for a cluster feed made
+     * later; the status has the place as far as the cluster's feed puts it. */
+    void set_cluster_width(unsigned pct);
+    void set_cluster_offset(int dx, int dy);
+    int cluster_offset_x() const { return base_.cluster_offset_x; }
+    int cluster_offset_y() const { return base_.cluster_offset_y; }
     /* The cluster map layer's guide_hold. */
     void set_guide_hold(bool hold);
 
