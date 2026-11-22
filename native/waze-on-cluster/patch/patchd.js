@@ -50,7 +50,7 @@
  *                  {"cmd":"hud-size","hud_width_pct":0|20..100}   (over 85 saved as 85)
  *                  {"cmd":"hud-pos","hud_x":-800..800,"hud_y":-800..800}
  *                  {"cmd":"hud-keep-shown","on":0|1}
- *                  {"cmd":"cluster-size","cluster_width_pct":0|20..100}
+ *                  {"cmd":"cluster-size","cluster_width_pct":0|30..100}
  *                  {"cmd":"cluster-pos","cluster_x":-800..800,"cluster_y":-800..800}
  *                                   the map on the cluster on or off, on the HUD on
  *                                   or off, the HUD's size
@@ -293,7 +293,8 @@ function rewriteConf(file, set, drop) {
  * range (the commands' below). */
 function mapValueOk(k, v) {
     var n = Number(v);
-    return /^-?\d+$/.test(v) && (k === 'hud_width_pct' || k === 'cluster_width_pct' ? n === 0 || (n >= 20 && n <= 100)
+    return /^-?\d+$/.test(v) && (k === 'hud_width_pct' ? n === 0 || (n >= 20 && n <= 100)
+        : k === 'cluster_width_pct' ? n === 0 || (n >= 30 && n <= 100)
         : /^(hud_offset_|cluster_offset_)/.test(k) ? n >= -800 && n <= 800 : n === 0 || n === 1);
 }
 
@@ -345,9 +346,9 @@ function isOffset(v) {
     return typeof v === 'number' && v === Math.floor(v) && v >= -800 && v <= 800;
 }
 
-/* A cluster width: 0 or 20-100 %. */
+/* A cluster width: 0 or 30-100 %. */
 function isClusterWidth(v) {
-    return typeof v === 'number' && v === Math.floor(v) && (v === 0 || (v >= 20 && v <= 100));
+    return typeof v === 'number' && v === Math.floor(v) && (v === 0 || (v >= 30 && v <= 100));
 }
 /* The map's settings wait MAP_SAVE_MS after the last change and go to
  * MAP_STATE in one write (a press of Move or a turn of the slider each
@@ -447,14 +448,14 @@ function profilesInUse(p) { return Object.keys(p.own).length > 0; }
 function profilesKept(p) { return profilesInUse(p) || !!p.shared; }
 /* The settings in effect as PROFILES_FILE keeps them. */
 function profileEntry(p) { return p.active ? p.own[p.active] : p.shared; }
-/* Settings as PROFILES_FILE holds them, or null when any key is missing or
- * out of range; hud_keep_shown missing (a set saved before it) is its default. */
+/* Settings as PROFILES_FILE holds them, or null when any key is out of range.
+ * Missing keys are filled from MAP_DEFAULTS (for new cluster keys in old profiles). */
 function profileSettings(o) {
     if (!o || typeof o !== 'object') return null;
     var s = {};
     for (var i = 0; i < MAP_KEYS.length; i++) {
         var k = MAP_KEYS[i];
-        var v = typeof o[k] === 'number' ? String(o[k]) : k === 'hud_keep_shown' && !(k in o) ? String(MAP_DEFAULTS[k]) : null;
+        var v = typeof o[k] === 'number' ? String(o[k]) : (k === 'hud_keep_shown' || k === 'cluster_width_pct' || k === 'cluster_offset_x' || k === 'cluster_offset_y') && !(k in o) ? String(MAP_DEFAULTS[k]) : null;
         if (v === null || !mapValueOk(k, v)) return null;
         s[k] = Number(v);
     }
@@ -2331,7 +2332,7 @@ function handle(line, sock) {
     if (msg.cmd === 'cluster-size') {
         var pct = msg.cluster_width_pct;
         if (!isClusterWidth(pct)) {
-            reply(sock, { ev: 'cluster-size-reply', ok: false, reason: 'cluster width must be 0 or 20-100 %' });
+            reply(sock, { ev: 'cluster-size-reply', ok: false, reason: 'cluster width must be 0 or 30-100 %' });
             return;
         }
         saveMapSettings(sock, 'cluster-size-reply', { cluster_width_pct: pct }, 'the cluster map size');

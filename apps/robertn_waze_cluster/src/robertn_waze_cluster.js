@@ -546,9 +546,12 @@ class WazeClusterApp extends OnlineApp {
         const c = this._control;
         [[ENABLE_NAME, t('Patch')], [DISABLE_NAME, t('Remove patch')], [AA_ENABLE_NAME, t('Patch')], [AA_DISABLE_NAME, t('Remove patch')],
             [AA_ZOOM_OUT_NAME, t('Zoom out')], [AA_ZOOM_IN_NAME, t('Zoom in')], [HEAD_GENERAL_NAME, t('General')], [LOGS_NAME, t('Logs')],
-            [HEAD_HUD_NAME, t('HUD')],
+            [HEAD_HUD_NAME, t('HUD')], [HEAD_CLUSTER_DISPLAY_NAME, t('Cluster Display Settings')],
             [HUD_MOVE_NAMES.left, t('Move left')], [HUD_MOVE_NAMES.right, t('Move right')], [HUD_MOVE_NAMES.up, t('Move up')],
             [HUD_MOVE_NAMES.down, t('Move down')], [HUD_CENTRE_NAME, t('Centre')],
+            [CLUSTER_MOVE_NAMES.left, t('Move left')], [CLUSTER_MOVE_NAMES.right, t('Move right')],
+            [CLUSTER_MOVE_NAMES.up, t('Move up')], [CLUSTER_MOVE_NAMES.down, t('Move down')],
+            [CLUSTER_CENTRE_NAME, t('Centre')], [CLUSTER_RESET_NAME, t('Reset')],
             [RESTART_NAME, t('Restart head unit')]].forEach(([name, text]) => this._write(name, text));
         this._write(STATUS_NAME, c.statusText());
         this._write(MAP_NAME, c.mapText());

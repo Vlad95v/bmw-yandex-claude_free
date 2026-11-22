@@ -4,7 +4,7 @@
  * and the tool (README.md "Using it").
  *
  *   owner -> tool  {"cmd":"cluster","on":"0"|"1"}  the map on the cluster off or on
- *                  {"cmd":"cluster","cluster_width_pct":"0"|"20".."100"}  the cluster map's size
+ *                  {"cmd":"cluster","cluster_width_pct":"0"|"30".."100"}  the cluster map's size
  *                  {"cmd":"cluster","cluster_x":"-800".."800","cluster_y":...}  where it is, from the centre
  *                  {"cmd":"hud","on":"0"|"1"}  the map on the HUD off or on
  *                  {"cmd":"hud","hud_width_pct":"0"|"20".."100"}  the HUD map's size

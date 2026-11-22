@@ -26,15 +26,18 @@ std::string trim(const std::string &s)
 }
 
 /* A whole number in the key's range: the map on (1) or off (0), 0 or 20-100 %
- * wide, -800..800 px from the centre, kept shown (1) or not (0). */
+ * wide (HUD), 0 or 30-100 % wide (cluster), -800..800 px from the centre,
+ * kept shown (1) or not (0). */
 bool valid(const std::string &key, const std::string &value)
 {
     char *end = nullptr;
     const long v = std::strtol(value.c_str(), &end, 10);
     if (value.empty() || *end)
         return false;
-    if (key == "hud_width_pct" || key == "cluster_width_pct")
+    if (key == "hud_width_pct")
         return v == 0 || (v >= 20 && v <= 100);
+    if (key == "cluster_width_pct")
+        return v == 0 || (v >= 30 && v <= 100);
     if (key == "hud_offset_x" || key == "hud_offset_y" || key == "cluster_offset_x" || key == "cluster_offset_y")
         return v >= -800 && v <= 800;
     return v == 0 || v == 1;

@@ -284,8 +284,12 @@ async function main() {
     const main = xmlIds('1').map(([id]) => [id, components[id].type, components[id].name, shipped(components[id])]);
     assert.deepStrictEqual(main.map(([id, type, name, text]) => (type === 'title' ? name : `${name} ${text}`)), [
         'wocTitle',
-        'wocHeadGeneral General', 'wocShowOn Show on: Cluster', 'wocProfile Own settings for this driver', 'wocMap Cluster map: Off', "wocGuide Hide BMW's turn box", 'wocLogs Logs',
-        'wocHeadHud HUD', 'wocHud HUD map: \u2014', "wocHudKeep Keep HUD map over BMW's pop-ups", 'wocHudSize Size: \u2014', 'wocHudPos Position: \u2014', 'wocHudLeft Move left',
+        'wocHeadGeneral General', 'wocShowOn Show on: Cluster', 'wocProfile Own settings for this driver', 'wocMap Cluster map: Off',
+        'wocHeadClusterDisplay Cluster Display Settings', 'wocClusterZoom Zoom: —', 'wocClusterPos Position: —',
+        'wocClusterLeft Move left', 'wocClusterRight Move right', 'wocClusterUp Move up', 'wocClusterDown Move down',
+        'wocClusterCentre Centre', 'wocClusterReset Reset',
+        "wocGuide Hide BMW's turn box", 'wocLogs Logs',
+        'wocHeadHud HUD', 'wocHud HUD map: —', "wocHudKeep Keep HUD map over BMW's pop-ups", 'wocHudSize Size: —', 'wocHudPos Position: —', 'wocHudLeft Move left',
         'wocHudRight Move right', 'wocHudUp Move up', 'wocHudDown Move down', 'wocHudCentre Centre',
         'wocHeadCarPlay CarPlay', 'wocStatus Status: Connecting…', 'wocEnable Patch', 'wocDisable Remove patch', 'wocWifi ', 'wocWifiHint ',
         'wocHeadAa Android Auto', 'wocAaStatus Status: Connecting…', 'wocAaEnable Patch', 'wocAaDisable Remove patch',

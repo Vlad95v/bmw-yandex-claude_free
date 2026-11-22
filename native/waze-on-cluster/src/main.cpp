@@ -101,29 +101,31 @@ public:
         auto pct = msg.find("hud_width_pct");
         auto hx = msg.find("hud_x"), hy = msg.find("hud_y"), on = msg.find("on");
         auto keep = msg.find("hud_keep_shown");
+        auto cluster_pct = msg.find("cluster_width_pct");
+        auto cluster_x = msg.find("cluster_x"), cluster_y = msg.find("cluster_y");
         if (cmd == "guide" && hide != msg.end() && guide_->set(hide->second)) {
             log_info("guide: BMW's turn box %s while the map shows", guide_->hide() ? "hidden" : "shown");
             feeds_->set_guide_hold(guide_->hide());
-        } else if (cmd == "cluster" && (on != msg.end() || pct != msg.end() || hx != msg.end() || hy != msg.end())) {
+        } else if (cmd == "cluster" && (on != msg.end() || cluster_pct != msg.end() || cluster_x != msg.end() || cluster_y != msg.end())) {
             if (on != msg.end()) {
                 if (on->second == "0" || on->second == "1")
                     feeds_->set_cluster(on->second == "1");
                 else
                     log_warn("cluster: on must be 0 or 1, not %s", on->second.c_str());
             }
-            if (pct != msg.end()) {
-                const long v = std::strtol(pct->second.c_str(), nullptr, 10);
-                if (v == 0 || (v >= 20 && v <= 100)) {
+            if (cluster_pct != msg.end()) {
+                const long v = std::strtol(cluster_pct->second.c_str(), nullptr, 10);
+                if (v == 0 || (v >= 30 && v <= 100)) {
                     log_info("cluster: map %ld%% wide", v);
                     feeds_->set_cluster_width((unsigned)v);
                 } else {
-                    log_warn("cluster: width %s out of range (0, or 20-100)", pct->second.c_str());
+                    log_warn("cluster: width %s out of range (0, or 30-100)", cluster_pct->second.c_str());
                 }
             }
             /* and where it is: moved from the centre, in cluster pixels (-800..800 each; held inside the cluster) */
-            if (hx != msg.end() || hy != msg.end()) {
-                const long x = hx != msg.end() ? std::strtol(hx->second.c_str(), nullptr, 10) : feeds_->cluster_offset_x();
-                const long y = hy != msg.end() ? std::strtol(hy->second.c_str(), nullptr, 10) : feeds_->cluster_offset_y();
+            if (cluster_x != msg.end() || cluster_y != msg.end()) {
+                const long x = cluster_x != msg.end() ? std::strtol(cluster_x->second.c_str(), nullptr, 10) : feeds_->cluster_offset_x();
+                const long y = cluster_y != msg.end() ? std::strtol(cluster_y->second.c_str(), nullptr, 10) : feeds_->cluster_offset_y();
                 if (x >= -800 && x <= 800 && y >= -800 && y <= 800) {
                     log_info("cluster: map moved %+ld,%+ld from the centre", x, y);
                     feeds_->set_cluster_offset((int)x, (int)y);
@@ -285,8 +287,8 @@ int serve(Config cfg)
     fc.hud_offset_y = (int)cfg.num("hud_offset_y");
     fc.hud_keep_shown = cfg.num("hud_keep_shown") != 0;
     fc.cluster_width_pct = (unsigned)cfg.num("cluster_width_pct");
-    if (fc.cluster_width_pct && fc.cluster_width_pct < 20) {
-        log_warn("cluster_width_pct %u: 0 or 20-100; the default box instead", fc.cluster_width_pct);
+    if (fc.cluster_width_pct && fc.cluster_width_pct < 30) {
+        log_warn("cluster_width_pct %u: 0 or 30-100; the default box instead", fc.cluster_width_pct);
         fc.cluster_width_pct = 0;
     }
     fc.cluster_offset_x = (int)cfg.num("cluster_offset_x");
