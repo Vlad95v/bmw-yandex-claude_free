@@ -498,6 +498,55 @@ var A = 'a1b2c3d4-0000-4000-8000-000000000001', B = 'a1b2c3d4-0000-4000-8000-000
     r = await ask({ cmd: 'profile', id: A });
     ok('back to A: kept shown, changed', r.ok && r.own && r.changed && r.settings.hud_keep_shown === 1 &&
         await when(function () { return state().hud_keep_shown === 1; }), JSON.stringify(r));
+
+    /* Extended profile tests: two profiles with different cluster settings */
+    var C = 'a1b2c3d4-0000-4000-8000-000000000003', D = 'a1b2c3d4-0000-4000-8000-000000000004';
+    fs.writeFileSync(STATE, 'cluster = 1\nhud = 0\nhud_width_pct = 0\nhud_offset_x = 0\nhud_offset_y = 0\nhud_keep_shown = 0\ncluster_width_pct = 0\ncluster_offset_x = 0\ncluster_offset_y = 0\n');
+    fs.unlinkSync(PROFILES);
+    await start();
+    await ask({ cmd: 'profile', id: C });
+    await ask({ cmd: 'profile-own', id: C, on: 1 });
+    /* C: cluster 45%, position -20, -10 */
+    await ask({ cmd: 'cluster', cluster_width_pct: 45 });
+    await ask({ cmd: 'cluster', cluster_x: -20, cluster_y: -10 });
+    await when(function () { return state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10; });
+    ok('C: own cluster settings saved', profiles().own[C].cluster_width_pct === 45 && profiles().own[C].cluster_offset_x === -20 && profiles().own[C].cluster_offset_y === -10);
+
+    await ask({ cmd: 'profile', id: D });
+    await ask({ cmd: 'profile-own', id: D, on: 1 });
+    /* D: cluster 60%, position 30, 20 */
+    await ask({ cmd: 'cluster', cluster_width_pct: 60 });
+    await ask({ cmd: 'cluster', cluster_x: 30, cluster_y: 20 });
+    await when(function () { return state().cluster_width_pct === 60 && state().cluster_offset_x === 30 && state().cluster_offset_y === 20; });
+    ok('D: own cluster settings saved', profiles().own[D].cluster_width_pct === 60 && profiles().own[D].cluster_offset_x === 30 && profiles().own[D].cluster_offset_y === 20);
+
+    /* Switch C -> D -> C */
+    await ask({ cmd: 'profile', id: C });
+    await when(function () { return state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10; });
+    ok('C restored: cluster 45%, pos -20,-10', state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10);
+
+    await ask({ cmd: 'profile', id: D });
+    await when(function () { return state().cluster_width_pct === 60 && state().cluster_offset_x === 30 && state().cluster_offset_y === 20; });
+    ok('D restored: cluster 60%, pos 30,20', state().cluster_width_pct === 60 && state().cluster_offset_x === 30 && state().cluster_offset_y === 20);
+
+    await ask({ cmd: 'profile', id: C });
+    await when(function () { return state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10; });
+    ok('C restored again: cluster 45%, pos -20,-10', state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10);
+
+    /* Simulate patchd restart */
+    await stop();
+    await start();
+    await ask({ cmd: 'profile', id: C });
+    await when(function () { return state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10; });
+    ok('After patchd restart: C restored', state().cluster_width_pct === 45 && state().cluster_offset_x === -20 && state().cluster_offset_y === -10 &&
+        profiles().own[C].cluster_width_pct === 45 && profiles().own[C].cluster_offset_x === -20 && profiles().own[C].cluster_offset_y === -10);
+
+    await ask({ cmd: 'profile', id: D });
+    await when(function () { return state().cluster_width_pct === 60 && state().cluster_offset_x === 30 && state().cluster_offset_y === 20; });
+    ok('After patchd restart: D restored', state().cluster_width_pct === 60 && state().cluster_offset_x === 30 && state().cluster_offset_y === 20 &&
+        profiles().own[D].cluster_width_pct === 60 && profiles().own[D].cluster_offset_x === 30 && profiles().own[D].cluster_offset_y === 20);
+
+    console.log('ok   Extended profile tests: two profiles with different cluster settings, C<->D switching, patchd restart restoration');
 })().catch(function (e) {
     ok('no error: ' + e.message, false);
 }).then(function () {

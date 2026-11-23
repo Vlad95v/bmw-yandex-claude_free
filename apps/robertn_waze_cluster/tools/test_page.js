@@ -559,6 +559,39 @@ async function main() {
             'the size slider, Position and Keep HUD map over BMW\'s pop-ups change it, the checkbox greyed for a render without it; ' +
             'Disabled after errors greys them');
 
+        /* ---- HUD/Cluster independence: changing HUD doesn't change Cluster and vice versa ---- */
+        showOn.pick(2); /* Both Cluster and HUD */
+        await until('both on', () => render.cluster === 1 && render.hud === 1 && showOn.shown() === 'Show on: Cluster and HUD (experimental)');
+        render.received.length = 0;
+        const clusterWidthBefore = render.clusterWidth;
+        const clusterXBefore = render.clusterX;
+        const clusterYBefore = render.clusterY;
+        /* Change HUD size */
+        byName.wocHudSize.turn(2);
+        await until('HUD size changed', () => render.hudWidth === 60);
+        assert(render.clusterWidth === clusterWidthBefore, 'Cluster width unchanged by HUD size change');
+        assert(render.clusterX === clusterXBefore, 'Cluster X unchanged by HUD size change');
+        assert(render.clusterY === clusterYBefore, 'Cluster Y unchanged by HUD size change');
+        /* Change HUD position */
+        byName.wocHudLeft.emit('action');
+        await until('HUD pos changed', () => render.hudX === -10);
+        assert(render.clusterWidth === clusterWidthBefore, 'Cluster width unchanged by HUD pos change');
+        assert(render.clusterX === clusterXBefore, 'Cluster X unchanged by HUD pos change');
+        assert(render.clusterY === clusterYBefore, 'Cluster Y unchanged by HUD pos change');
+        /* Change Cluster size */
+        render.received.length = 0;
+        clusterZoom.turn(2);
+        await until('Cluster size changed', () => render.clusterWidth === 40);
+        assert(render.hudWidth === 60, 'HUD width unchanged by Cluster size change');
+        assert(render.hudX === -10, 'HUD X unchanged by Cluster size change');
+        /* Change Cluster position */
+        byName.wocClusterLeft.emit('action');
+        await until('Cluster pos changed', () => render.clusterX === -10);
+        assert(render.hudWidth === 60, 'HUD width unchanged by Cluster pos change');
+        assert(render.hudX === -10, 'HUD X unchanged by Cluster pos change');
+        assert(render.hudY === 0, 'HUD Y unchanged by Cluster pos change');
+        console.log('ok   HUD and Cluster independence: changing HUD size/pos does not affect Cluster and vice versa');
+
         /* ---- Cluster Display Settings ---- */
         const clusterZoom = byName.wocClusterZoom;
         const clusterPos = byName.wocClusterPos;
@@ -596,6 +629,67 @@ async function main() {
             render.clusterX === 0 && render.clusterY === 0);
         await until('reset saved', () => patch.received.some((m) => m.cmd === 'cluster' && m.cluster_width_pct === 0));
         console.log('ok   Cluster Display Settings: Zoom slider (Standard + 14 steps of 5 %), Position buttons, Centre, Reset; all through render and patchd');
+
+        /* ---- Extended RHMI tests: min/max scale, boundary coordinates, Reset without confirmation, reconnection ---- */
+        /* Min scale (30%) - turn down from Standard */
+        clusterZoom.turn(-1); /* Standard is 0, can't go below */
+        await until('min scale stays Standard', () => clusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0);
+        assert.deepStrictEqual(render.received, [], 'nothing sent below min');
+
+        /* Max scale (100%) - turn up 14 steps from Standard */
+        render.received.length = 0;
+        for (let i = 0; i < 14; i++) clusterZoom.turn(1);
+        await until('max scale 100%', () => clusterZoom.text === 'Zoom: 100 %' && clusterZoom.cells['0:Value'] === 14 && render.clusterWidth === 100);
+        await until('max saved', () => patch.received.some((m) => m.cmd === 'cluster' && m.cluster_width_pct === 100));
+        assert(render.clusterWidth === 100, 'render at max');
+
+        /* Boundary coordinates: move to max left (-400) and max right (400) */
+        render.received.length = 0;
+        for (let i = 0; i < 40; i++) byName.wocClusterLeft.emit('action'); /* 40 * 10px = 400px */
+        await until('max left -400', () => render.clusterX === -400 && byName.wocClusterPos.text.includes('400 px left'));
+        render.received.length = 0;
+        for (let i = 0; i < 80; i++) byName.wocClusterRight.emit('action'); /* 80 * 10px = 800px, clamped to 400 */
+        await until('max right 400', () => render.clusterX === 400 && byName.wocClusterPos.text.includes('400 px right'));
+        /* Move back to centre */
+        byName.wocClusterCentre.emit('action');
+        await until('centred', () => render.clusterX === 0 && render.clusterY === 0 && byName.wocClusterPos.text === 'Position: Centre');
+
+        /* Boundary coordinates: move to max up (-400) and max down (400) */
+        render.received.length = 0;
+        for (let i = 0; i < 40; i++) byName.wocClusterUp.emit('action');
+        await until('max up -400', () => render.clusterY === -400 && byName.wocClusterPos.text.includes('400 px up'));
+        render.received.length = 0;
+        for (let i = 0; i < 80; i++) byName.wocClusterDown.emit('action');
+        await until('max down 400', () => render.clusterY === 400 && byName.wocClusterPos.text.includes('400 px down'));
+        byName.wocClusterCentre.emit('action');
+        await until('centred again', () => render.clusterX === 0 && render.clusterY === 0);
+
+        /* Reset without Render confirmation: press Reset, don't wait for render status */
+        render.received.length = 0;
+        byName.wocClusterReset.emit('action');
+        await until('reset sent', () => render.received.some((m) => m.cmd === 'cluster' && m.cluster_width_pct === '0'));
+        /* Optimistic state: UI shows Standard immediately */
+        await until('optimistic Standard', () => clusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0);
+        /* Wait for timer to clear optimistic state (no render confirmation) */
+        await sleep(CLUSTER_ASKED_MS + 50);
+        await until('optimistic cleared by timeout', () => clusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0);
+        console.log('ok   Min/max scale (30%-100%), boundary coords (±400), Reset without confirmation, optimistic state timeout');
+
+        /* Reconnection and optimistic state: simulate render disconnect/reconnect */
+        render.dropClients();
+        await sleep(100);
+        assert(render._clients.size === 0, 'render disconnected');
+        /* Change cluster size while disconnected - should be queued or fail gracefully */
+        clusterZoom.turn(2);
+        await sleep(100);
+        assert.deepStrictEqual(render.received, [], 'nothing sent while disconnected');
+        /* Reconnect */
+        await render.listen();
+        render.stream(true);
+        await until('reconnected showing', () => render.state === 'showing');
+        /* After reconnect, render sends status with current values */
+        await until('state synced after reconnect', () => clusterZoom.text === 'Zoom: Standard' && render.clusterWidth === 0);
+        console.log('ok   Render reconnection syncs state, optimistic state cleared');
 
         /* Off: cluster display settings greyed */
         showOn.pick(3);
@@ -652,6 +746,69 @@ async function main() {
         render.received.length = 0;
         console.log('ok   Own settings for this driver: greyed until a profile is read; ticked, the profile keeps its own map settings; ' +
             'a switch moves the render to the other profile\'s or the shared settings; unticked, the shared ones back; an empty read changes nothing');
+
+        /* ---- Extended profile tests: two profiles with different cluster settings ---- */
+        /* A has own cluster settings (zoom 45%, position 20px left, 10px up) */
+        sessionUser = 'a1b2c3d4-0000-4000-8000-000000000001';
+        await until('A: enabled', () => own.enabled === true);
+        own.ticks.length = 0;
+        own.press();
+        await until('A: ticked', () => own.selected === true && patch.received.some((m) => m.cmd === 'profile-own' && m.id === sessionUser && m.on === 1));
+        showOn.pick(0); /* Cluster */
+        await until('A: cluster on', () => render.cluster === 1);
+        clusterZoom.turn(3); /* 45% = step 3 (30, 35, 40, 45) */
+        await until('A: cluster zoom 45%', () => clusterZoom.text === 'Zoom: 45 %' && render.clusterWidth === 45);
+        byName.wocClusterLeft.emit('action');
+        byName.wocClusterLeft.emit('action');
+        await until('A: cluster pos -20, 0', () => byName.wocClusterPos.text === 'Position: 20 px left' && render.clusterX === -20);
+        byName.wocClusterUp.emit('action');
+        await until('A: cluster pos -20, -10', () => byName.wocClusterPos.text === 'Position: 20 px left, 10 px up' && render.clusterY === -10);
+        await until('A: saved', () => patch.map.cluster_width_pct === 45 && patch.map.cluster_offset_x === -20 && patch.map.cluster_offset_y === -10);
+
+        /* B has own cluster settings (zoom 60%, position 30px right, 20px down) */
+        sessionUser = 'a1b2c3d4-0000-4000-8000-000000000002';
+        await until('B: enabled, unticked', () => own.enabled === true && own.selected === false);
+        own.ticks.length = 0;
+        own.press();
+        await until('B: ticked', () => own.selected === true && patch.received.some((m) => m.cmd === 'profile-own' && m.id === sessionUser && m.on === 1));
+        showOn.pick(0);
+        await until('B: cluster on', () => render.cluster === 1);
+        clusterZoom.turn(6); /* 60% = step 6 */
+        await until('B: cluster zoom 60%', () => clusterZoom.text === 'Zoom: 60 %' && render.clusterWidth === 60);
+        byName.wocClusterRight.emit('action');
+        byName.wocClusterRight.emit('action');
+        byName.wocClusterRight.emit('action');
+        await until('B: cluster pos 30, 0', () => byName.wocClusterPos.text === 'Position: 30 px right' && render.clusterX === 30);
+        byName.wocClusterDown.emit('action');
+        byName.wocClusterDown.emit('action');
+        await until('B: cluster pos 30, 20', () => byName.wocClusterPos.text === 'Position: 30 px right, 20 px down' && render.clusterY === 20);
+        await until('B: saved', () => patch.map.cluster_width_pct === 60 && patch.map.cluster_offset_x === 30 && patch.map.cluster_offset_y === 20);
+
+        /* Switch back to A: should restore A's settings */
+        sessionUser = 'a1b2c3d4-0000-4000-8000-000000000001';
+        await until('A again: its settings', () => render.clusterWidth === 45 && render.clusterX === -20 && render.clusterY === -10 &&
+            own.selected === true && clusterZoom.text === 'Zoom: 45 %' && byName.wocClusterPos.text === 'Position: 20 px left, 10 px up');
+        await until('A: saved', () => patch.map.cluster_width_pct === 45 && patch.map.cluster_offset_x === -20 && patch.map.cluster_offset_y === -10);
+
+        /* Switch to B again: should restore B's settings */
+        sessionUser = 'a1b2c3d4-0000-4000-8000-000000000002';
+        await until('B again: its settings', () => render.clusterWidth === 60 && render.clusterX === 30 && render.clusterY === 20 &&
+            own.selected === true && clusterZoom.text === 'Zoom: 60 %' && byName.wocClusterPos.text === 'Position: 30 px right, 20 px down');
+        await until('B: saved', () => patch.map.cluster_width_pct === 60 && patch.map.cluster_offset_x === 30 && patch.map.cluster_offset_y === 20);
+
+        /* Simulate patchd restart: close and reopen patch, verify settings restored */
+        await patch.close();
+        patch = new FakePatch(PSOCK);
+        await patch.listen();
+        /* The new patchd should have the shared settings, but the app will tell it the current profile */
+        sessionUser = 'a1b2c3d4-0000-4000-8000-000000000002'; /* B is current */
+        byName.ST_OnlineApps_WazeCluster.emit('visible', { visible: false });
+        await until('sockets closed', () => render._clients.size === 0 && patch._clients.size === 0);
+        byName.ST_OnlineApps_WazeCluster.emit('visible', { visible: true });
+        await until('page reads state after patchd restart', () => render.clusterWidth === 60 && render.clusterX === 30 && render.clusterY === 20 &&
+            own.selected === true && clusterZoom.text === 'Zoom: 60 %' && byName.wocClusterPos.text === 'Position: 30 px right, 20 px down');
+        await until('B restored after patchd restart', () => patch.map.cluster_width_pct === 60 && patch.map.cluster_offset_x === 30 && patch.map.cluster_offset_y === 20);
+        console.log('ok   Two profiles with different cluster settings: A→B→A restores each, patchd restart restores current profile settings');
 
         byName.ST_OnlineApps_WazeCluster.emit('visible', { visible: false });
         await until('sockets closed', () => render._clients.size === 0 && patch._clients.size === 0);

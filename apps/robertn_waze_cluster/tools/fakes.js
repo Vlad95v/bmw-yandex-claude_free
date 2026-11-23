@@ -158,11 +158,13 @@ class FakeRender extends LineServer {
 
     _status() {
         const s = { ev: 'status', state: this.state, target: this.target, page: this.page, reason: this.reason };
+        /* Cluster fields: always present when the tool supports them. */
+        Object.assign(s, { cluster: this.cluster,
+            cluster_width_pct: this.clusterWidth, cluster_x: this.clusterX, cluster_y: this.clusterY });
         /* hud null: a tool without the HUD's fields (one refused by its head unit) */
         if (this.hud !== null) {
-            Object.assign(s, { cluster: this.cluster, hud: this.hud, hud_state: this.hud ? this.hudState || this.state : 'off',
-                hud_width_pct: this.hudWidth || 0, hud_x: this.hudX || 0, hud_y: this.hudY || 0,
-                cluster_width_pct: this.clusterWidth, cluster_x: this.clusterX, cluster_y: this.clusterY });
+            Object.assign(s, { hud: this.hud, hud_state: this.hud ? this.hudState || this.state : 'off',
+                hud_width_pct: this.hudWidth || 0, hud_x: this.hudX || 0, hud_y: this.hudY || 0 });
             if (this.hudKeep !== null) s.hud_keep_shown = this.hudKeep;
         }
         if (this.hide !== null) {

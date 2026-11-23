@@ -683,8 +683,13 @@ class WazeClusterControl extends EventEmitter {
     resetCluster() {
         if (this.canResetCluster()) {
             this._setClusterPos(0, 0);
-            this._clearAskedCluster();
+            /* Set optimistic state for size reset with timeout, like setClusterSizeStep. */
             this._askedCluster = 0;
+            clearTimeout(this._askedClusterTimer);
+            this._askedClusterTimer = setTimeout(() => {
+                this._askedCluster = null;
+                this.emit('change');
+            }, CLUSTER_ASKED_MS);
             this.render.send({ cmd: 'cluster', cluster_width_pct: '0' });
             this.patch.send({ cmd: 'cluster-size', cluster_width_pct: 0 });
             this.emit('change');
