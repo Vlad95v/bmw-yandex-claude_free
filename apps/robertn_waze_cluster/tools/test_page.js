@@ -71,10 +71,11 @@ const XML = fs.readFileSync(path.join(UI_DIR, 'application.xml'), 'utf8');
 const APP_JSON = JSON.parse(fs.readFileSync(path.join(PKG, 'rhmiData', 'application.json'), 'utf8'));
 
 /* short: macOS limits a socket path to 104 bytes */
-const RSOCK = `/tmp/woc-pr-${process.pid}.sock`;
-const PSOCK = `/tmp/woc-pp-${process.pid}.sock`;
-const PENDING = `/tmp/woc-ppend-${process.pid}.json`;
-const LSOCK = `/tmp/woc-pl-${process.pid}.sock`;
+const TMP = process.platform === 'win32' ? path.join(require('os').tmpdir(), 'woc-test') : '/tmp';
+const RSOCK = path.join(TMP, `woc-pr-${process.pid}.sock`);
+const PSOCK = path.join(TMP, `woc-pp-${process.pid}.sock`);
+const PENDING = path.join(TMP, `woc-ppend-${process.pid}.json`);
+const LSOCK = path.join(TMP, `woc-pl-${process.pid}.sock`);
 const SOCKETS = { [RENDER_PATH]: RSOCK, [PATCH_PATH]: PSOCK, [LOGS_PATH]: LSOCK };
 const realConnect = net.connect;
 const exit = process.exit.bind(process);
@@ -557,6 +558,58 @@ async function main() {
             'Off for neither, the HUD\'s rows and the turn box greyed then; the HUD: off by default with its size and position greyed; ' +
             'the size slider, Position and Keep HUD map over BMW\'s pop-ups change it, the checkbox greyed for a render without it; ' +
             'Disabled after errors greys them');
+
+        /* ---- Cluster Display Settings ---- */
+        const clusterZoom = byName.wocClusterZoom;
+        const clusterPos = byName.wocClusterPos;
+        const clusterRows = () => ['wocClusterLeft', 'wocClusterRight', 'wocClusterUp', 'wocClusterDown', 'wocClusterCentre', 'wocClusterReset'].map((n) => byName[n].enabled);
+        await until('cluster display settings visible', () => byName.wocHeadClusterDisplay.text === 'Cluster Display Settings' &&
+            byName.wocClusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0 &&
+            byName.wocClusterPos.text === 'Position: Centre');
+        assert(clusterRows().every((e) => e === true), 'cluster position buttons enabled when cluster is on');
+        render.received.length = 0;
+        clusterZoom.turn(1);
+        await until('larger', () => clusterZoom.text === 'Zoom: 35 %' && render.clusterWidth === 35 && clusterZoom.cells['0:Value'] === 1);
+        await until('saved', () => patch.received.some((m) => m.cmd === 'cluster' && m.cluster_width_pct === 35));
+        clusterZoom.turn(1);
+        clusterZoom.turn(1);
+        await until('larger again', () => clusterZoom.text === 'Zoom: 45 %' && render.clusterWidth === 45);
+        byName.wocClusterLeft.emit('action');
+        await until('moved', () => byName.wocClusterPos.text === 'Position: 10 px left' && byName.wocClusterCentre.enabled === true);
+        await until('the move at the render', () => render.clusterX === -10);
+        byName.wocClusterCentre.emit('action');
+        await until('centred', () => byName.wocClusterPos.text === 'Position: Centre' && render.clusterX === 0 && render.clusterY === 0);
+        byName.wocClusterUp.emit('action');
+        byName.wocClusterUp.emit('action');
+        await until('moved up', () => byName.wocClusterPos.text === 'Position: 20 px up' && render.clusterY === -20);
+        byName.wocClusterDown.emit('action');
+        byName.wocClusterDown.emit('action');
+        byName.wocClusterDown.emit('action');
+        await until('moved down', () => byName.wocClusterPos.text === 'Position: 10 px down' && render.clusterY === 10);
+        byName.wocClusterRight.emit('action');
+        await until('moved right', () => byName.wocClusterPos.text === 'Position: 10 px right' && render.clusterX === 10);
+        byName.wocClusterCentre.emit('action');
+        await until('centred again', () => byName.wocClusterPos.text === 'Position: Centre' && render.clusterX === 0 && render.clusterY === 0);
+        byName.wocClusterReset.emit('action');
+        await until('reset', () => clusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0 &&
+            render.clusterWidth === 0 && byName.wocClusterPos.text === 'Position: Centre' &&
+            render.clusterX === 0 && render.clusterY === 0);
+        await until('reset saved', () => patch.received.some((m) => m.cmd === 'cluster' && m.cluster_width_pct === 0));
+        console.log('ok   Cluster Display Settings: Zoom slider (Standard + 14 steps of 5 %), Position buttons, Centre, Reset; all through render and patchd');
+
+        /* Off: cluster display settings greyed */
+        showOn.pick(3);
+        await until('off from the cluster', () => render.cluster === 0 && render.hud === 0 && offShown());
+        assert(clusterRows().every((e) => e === false), 'cluster position buttons greyed when off');
+        clusterZoom.turn(1);
+        await until('a greyed slider turned: back where it was', () => clusterZoom.cells['0:Value'] === 0);
+        assert.deepStrictEqual(render.received, [], 'nothing sent while off');
+        showOn.pick(0);
+        await until('the cluster from off', () => render.cluster === 1 && render.hud === 0 && showOn.shown() === 'Show on: Cluster' &&
+            byName.wocGuide.enabled === true && /^Cluster map: Showing/.test(byName.wocMap.text));
+        assert(clusterRows().every((e) => e === true), 'cluster position buttons enabled again');
+        render.received.length = 0;
+        console.log('ok   Cluster Display Settings greyed when map is Off, enabled when Cluster is on');
 
         /* ---- own settings per driver profile ---- */
         const own = byName.wocProfile;

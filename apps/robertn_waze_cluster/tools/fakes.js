@@ -35,6 +35,7 @@
 const EventEmitter = require('events');
 const fs = require('fs');
 const net = require('net');
+const path = require('path');
 
 const STEP_MS = 40;
 const BACKLOG = 60;
@@ -57,6 +58,8 @@ class LineServer extends EventEmitter {
         } catch (e) {
             /* no stale socket */
         }
+        const dir = path.dirname(this.path);
+        try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
         return new Promise((resolve) => this._server.listen(this.path, resolve));
     }
 
@@ -131,6 +134,10 @@ class FakeRender extends LineServer {
         this.hudState = null;
         /* the HUD map kept shown over BMW's pop-ups (null: a tool without the field) */
         this.hudKeep = 0;
+        /* the cluster: its size (width pct) and position */
+        this.clusterWidth = 0;
+        this.clusterX = 0;
+        this.clusterY = 0;
         this._showTimer = null;
     }
 
@@ -154,7 +161,8 @@ class FakeRender extends LineServer {
         /* hud null: a tool without the HUD's fields (one refused by its head unit) */
         if (this.hud !== null) {
             Object.assign(s, { cluster: this.cluster, hud: this.hud, hud_state: this.hud ? this.hudState || this.state : 'off',
-                hud_width_pct: this.hudWidth || 0, hud_x: this.hudX || 0, hud_y: this.hudY || 0 });
+                hud_width_pct: this.hudWidth || 0, hud_x: this.hudX || 0, hud_y: this.hudY || 0,
+                cluster_width_pct: this.clusterWidth, cluster_x: this.clusterX, cluster_y: this.clusterY });
             if (this.hudKeep !== null) s.hud_keep_shown = this.hudKeep;
         }
         if (this.hide !== null) {
@@ -189,8 +197,13 @@ class FakeRender extends LineServer {
             this.hide = msg.hide;
             this._broadcast(this._status());
         }
-        if (msg.cmd === 'cluster' && msg.on !== undefined) {
-            this.cluster = Number(msg.on);
+        if (msg.cmd === 'cluster') {
+            if (msg.on !== undefined) {
+                this.cluster = Number(msg.on);
+            }
+            if (msg.cluster_width_pct !== undefined) this.clusterWidth = Number(msg.cluster_width_pct);
+            if (msg.cluster_x !== undefined) this.clusterX = Number(msg.cluster_x);
+            if (msg.cluster_y !== undefined) this.clusterY = Number(msg.cluster_y);
             this._broadcast(this._status());
         }
         if (msg.cmd === 'hud') {
@@ -443,8 +456,11 @@ class FakeLogs extends LineServer {
 module.exports = { FakeRender, FakePatch, FakeLogs, RENDER_PAGE, RENDER_FPS };
 
 if (require.main === module) {
-    const render = new FakeRender(process.argv[2] || '/tmp/woc-render.sock');
-    const patch = new FakePatch(process.argv[3] || '/tmp/woc-patch.sock');
+    const os = require('os');
+    const path = require('path');
+    const TMP = process.platform === 'win32' ? path.join(os.tmpdir(), 'woc-test') : '/tmp';
+    const render = new FakeRender(process.argv[2] || path.join(TMP, 'woc-render.sock'));
+    const patch = new FakePatch(process.argv[3] || path.join(TMP, 'woc-patch.sock'));
     render.on('command', (m) => console.log(`render <- ${JSON.stringify(m)}`));
     patch.on('command', (m) => console.log(`patch  <- ${JSON.stringify(m)}`));
     render.log('fake render tool started');
