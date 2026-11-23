@@ -666,6 +666,7 @@ async function main() {
 
         /* Reset without Render confirmation: press Reset, don't wait for render status */
         render.received.length = 0;
+        render.confirmCluster = false; /* accept commands but don't send confirming status */
         byName.wocClusterReset.emit('action');
         await until('reset sent', () => render.received.some((m) => m.cmd === 'cluster' && m.cluster_width_pct === '0'));
         /* Optimistic state: UI shows Standard immediately */
@@ -673,23 +674,52 @@ async function main() {
         /* Wait for timer to clear optimistic state (no render confirmation) */
         await sleep(CLUSTER_ASKED_MS + 50);
         await until('optimistic cleared by timeout', () => clusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0);
+        render.confirmCluster = true; /* restore normal behavior */
         console.log('ok   Min/max scale (30%-100%), boundary coords (±400), Reset without confirmation, optimistic state timeout');
 
         /* Reconnection and optimistic state: simulate render disconnect/reconnect */
+        /* First, set optimistic state */
+        clusterZoom.turn(3); /* set to 45% */
+        await until('optimistic 45%', () => clusterZoom.text === 'Zoom: 45 %' && render.clusterWidth === 45);
+        /* Now disconnect */
         render.dropClients();
         await sleep(100);
         assert(render._clients.size === 0, 'render disconnected');
-        /* Change cluster size while disconnected - should be queued or fail gracefully */
+        /* Optimistic state should be cleared on disconnect (handled by render.on('close')) */
+        await until('optimistic cleared on disconnect', () => clusterZoom.text === 'Zoom: Standard' && clusterZoom.cells['0:Value'] === 0);
+        /* Change cluster size while disconnected - should fail gracefully */
         clusterZoom.turn(2);
         await sleep(100);
         assert.deepStrictEqual(render.received, [], 'nothing sent while disconnected');
-        /* Reconnect */
+        /* Reconnect: properly close and reopen */
+        await render.close();
         await render.listen();
         render.stream(true);
         await until('reconnected showing', () => render.state === 'showing');
         /* After reconnect, render sends status with current values */
         await until('state synced after reconnect', () => clusterZoom.text === 'Zoom: Standard' && render.clusterWidth === 0);
-        console.log('ok   Render reconnection syncs state, optimistic state cleared');
+        console.log('ok   Render reconnection syncs state, optimistic state cleared on disconnect and reconnect');
+
+        /* Timer races: change Cluster, change again before first timer expires, reconnect, receive old status, receive new status */
+        render.received.length = 0;
+        clusterZoom.turn(2); /* 40% - first change */
+        await until('first change', () => render.clusterWidth === 40 && clusterZoom.cells['0:Value'] === 2);
+        const firstTimer = Date.now() + CLUSTER_ASKED_MS;
+        clusterZoom.turn(2); /* 50% - second change before first timer expires */
+        await until('second change', () => render.clusterWidth === 50 && clusterZoom.cells['0:Value'] === 4);
+        /* Wait for first timer to fire (should not clear the second change) */
+        await sleep(CLUSTER_ASKED_MS + 50);
+        await until('first timer fired, second change preserved', () => clusterZoom.text === 'Zoom: 50 %' && clusterZoom.cells['0:Value'] === 4);
+        /* Now simulate old status arriving after reconnect */
+        render.clusterWidth = 40;
+        render._broadcast(render._status());
+        await sleep(50);
+        await until('old status ignored', () => clusterZoom.text === 'Zoom: 50 %' && clusterZoom.cells['0:Value'] === 4);
+        /* New status arrives */
+        render.clusterWidth = 50;
+        render._broadcast(render._status());
+        await until('new status accepted', () => clusterZoom.text === 'Zoom: 50 %' && clusterZoom.cells['0:Value'] === 4);
+        console.log('ok   Timer races: second change before first timer, old status after reconnect ignored, new status accepted');
 
         /* Off: cluster display settings greyed */
         showOn.pick(3);

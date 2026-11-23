@@ -138,6 +138,8 @@ class FakeRender extends LineServer {
         this.clusterWidth = 0;
         this.clusterX = 0;
         this.clusterY = 0;
+        /* when false: accepts Cluster commands but does not send confirming status */
+        this.confirmCluster = true;
         this._showTimer = null;
     }
 
@@ -206,7 +208,9 @@ class FakeRender extends LineServer {
             if (msg.cluster_width_pct !== undefined) this.clusterWidth = Number(msg.cluster_width_pct);
             if (msg.cluster_x !== undefined) this.clusterX = Number(msg.cluster_x);
             if (msg.cluster_y !== undefined) this.clusterY = Number(msg.cluster_y);
-            this._broadcast(this._status());
+            if (this.confirmCluster) {
+                this._broadcast(this._status());
+            }
         }
         if (msg.cmd === 'hud') {
             if (msg.on !== undefined) this.hud = Number(msg.on);

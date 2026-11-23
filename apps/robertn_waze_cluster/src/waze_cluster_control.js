@@ -317,6 +317,8 @@ class WazeClusterControl extends EventEmitter {
             this.renderStatus = null;
             this._askedShownOn = null;
             this._clearAskedHud();
+            this._clearAskedCluster();
+            this._clearAskedClusterPos();
             this.emit('change');
         };
         this.render.on('connect', reset);
@@ -641,6 +643,11 @@ class WazeClusterControl extends EventEmitter {
     _clearAskedCluster() {
         clearTimeout(this._askedClusterTimer);
         this._askedCluster = null;
+    }
+
+    _clearAskedClusterPos() {
+        clearTimeout(this._askedClusterPosTimer);
+        this._askedClusterPos = null;
     }
 
     /* ---- where the cluster map is: moved from its centre, in cluster pixels ---- */
